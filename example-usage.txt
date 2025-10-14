@@ -11,12 +11,36 @@ INFO: USB Serial: 115200 baud
 INFO: AUX Serial: 19200 baud
 INFO: AUX Pins: RX=16, TX=17
 INFO: 
+INFO: Initializing WiFi...
+SUCCESS: WiFi Manager initialized
+INFO: WiFi AP mode active
+INFO: Connect to: Celestron-Focuser
+INFO: Password: focuser123
+INFO: Web interface: http://192.168.4.1
+INFO: mDNS hostname: celestron-focuser.local
+INFO: Web interface (mDNS): http://celestron-focuser.local
+INFO: 
 SUCCESS: Focuser initialized successfully
 SUCCESS: Firmware Version: 1.2
 INFO: Current Position: 15000
 INFO: Target Position: 15000
 INFO: Current Speed: 5
 INFO: Moving: No
+INFO: 
+INFO: ==================================
+INFO: Web Interface Available!
+INFO: ==================================
+INFO: Access via: http://192.168.4.1
+INFO: Or via mDNS: http://celestron-focuser.local
+INFO: 
+INFO: Web Interface Features:
+INFO: - Complete focuser control
+INFO: - Real-time position display
+INFO: - Speed adjustment (1-9)
+INFO: - Move IN/OUT buttons
+INFO: - Go to Position input
+INFO: - Emergency STOP button
+INFO: - Mobile-friendly design
 INFO: 
 INFO: Available Commands:
 INFO:   +     - Move focuser INWARD (continuous)
@@ -25,8 +49,16 @@ INFO:   s, 0  - Stop movement
 INFO:   p     - Get current position
 INFO:   g#### - Go to absolute position (e.g., g5000)
 INFO:   1-9   - Set motor speed (1=slowest, 9=fastest)
+INFO:   c     - Connect to focuser (retry connection)
+INFO:   d     - Run diagnostics (troubleshoot connection)
+INFO:   t     - Test different baud rates
+INFO:   w     - Show WiFi status and web interface URL
 INFO:   ?     - Show this help
 INFO:   i     - Show status information
+INFO: 
+INFO: WiFi Web Interface:
+INFO:   URL: http://192.168.4.1
+INFO:   Use web interface to configure WiFi settings
 ```
 
 ## Example Commands
@@ -72,6 +104,18 @@ INFO: Moving focuser INWARD at speed 1
 > s
 INFO: Stopping focuser
 SUCCESS: Focuser reached target position: 19995
+```
+
+### WiFi Status Check
+```
+> w
+INFO: WiFi Status:
+INFO:   Connected: No
+INFO:   Mode: AP
+INFO:   SSID: Celestron-Focuser
+INFO:   IP: 192.168.4.1
+INFO:   Hostname: celestron-focuser
+INFO:   Web interface: http://192.168.4.1
 ```
 
 ### Error Handling Example

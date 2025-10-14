@@ -10,13 +10,19 @@ A USB-to-AUX serial bridge that allows you to control your Celestron focuser thr
 - **Real-time Status**: Monitor position and movement status
 - **Safety Features**: Built-in error handling and timeout protection
 - **Verified Protocol**: Based on actual INDI driver source code
+- **WiFi Connectivity**: Built-in WiFi with AP/Station modes
+- **Web Interface**: Easy WiFi configuration and focuser control through web browser
+- **Remote Control**: Full focuser control over WiFi network with real-time status
+- **Real-time Updates**: Live position tracking and status updates via WebSocket
+- **mDNS Support**: Access device by friendly hostname (e.g., celestron-focuser.local)
 
 ## Hardware Requirements
 
 ### ESP32 DevKit v1 Board
-- ESP32 microcontroller
+- ESP32 microcontroller with built-in WiFi
 - USB connection for programming and communication
 - GPIO16/17 for AUX port communication
+- Built-in WiFi antenna for network connectivity
 
 ### Level Shifter (Required!)
 - **74HC125** Quad 3-State Buffer (recommended)
@@ -230,6 +236,155 @@ SUCCESS: Focuser reached target position: 14850
 INFO: Moving to position 20000
 SUCCESS: Focuser reached target position: 20000
 ```
+
+## WiFi Setup and Web Interface
+
+### Initial WiFi Configuration
+
+When the ESP32 starts for the first time (or if no WiFi credentials are saved), it will automatically start in Access Point (AP) mode:
+
+1. **Connect to ESP32 AP**:
+   - SSID: `Celestron-Focuser`
+   - Password: `focuser123`
+
+2. **Open Web Interface**:
+   - Navigate to: `http://192.168.4.1`
+   - The web interface will load automatically
+
+3. **Configure WiFi**:
+   - Enter your WiFi network name (SSID)
+   - Enter your WiFi password
+   - Optionally set a custom hostname
+   - Click "Save & Connect"
+
+4. **Device Restart**:
+   - The ESP32 will restart and attempt to connect to your WiFi
+   - Once connected, it will switch to Station mode
+   - The web interface will be available at the ESP32's IP address
+   - mDNS will make the device accessible at `celestron-focuser.local` (or your custom hostname)
+
+### WiFi Operation Modes
+
+#### Access Point (AP) Mode
+- **When**: No saved WiFi credentials or connection failed
+- **SSID**: `Celestron-Focuser`
+- **Password**: `focuser123`
+- **IP**: `192.168.4.1`
+- **Purpose**: Initial setup and configuration
+
+#### Station Mode
+- **When**: Successfully connected to configured WiFi network
+- **IP**: Assigned by your router (check serial monitor or use `w` command)
+- **Hostname**: `celestron-focuser` (or custom name)
+- **mDNS**: `celestron-focuser.local` (or custom-name.local)
+- **Purpose**: Normal operation on your network
+
+### Web Interface Features
+
+The web interface provides:
+
+- **Focuser Control Panel**: Complete focuser control interface with:
+  - Real-time position display (current and target)
+  - Speed control slider (1-9)
+  - Move IN/OUT buttons for continuous movement
+  - Go to Position for precise positioning
+  - Emergency STOP button
+  - Connection status indicators
+- **WiFi Configuration**: Easy setup of network credentials
+- **Real-time Status**: Current WiFi and focuser status with live updates
+- **Device Information**: IP address, signal strength, hostname, mDNS name
+- **Configuration Management**: Save/clear WiFi settings
+- **Responsive Design**: Works on desktop and mobile devices
+- **mDNS Integration**: Shows friendly hostname for easy access
+- **WebSocket Communication**: Real-time bidirectional communication
+
+### WiFi Commands
+
+New serial commands for WiFi management:
+
+- `w` - Show WiFi status and web interface URL
+- `?` - Show help (includes WiFi web interface URL)
+
+### Web Control Usage
+
+Once connected to WiFi, you can control the focuser through the web interface:
+
+#### Accessing the Web Interface
+1. **Via mDNS**: `http://celestron-focuser.local` (recommended)
+2. **Via IP**: `http://[ESP32-IP-ADDRESS]` (use `w` command to see IP)
+3. **Via AP Mode**: `http://192.168.4.1` (when in Access Point mode)
+
+#### Focuser Control Features
+- **Real-time Position**: Shows current focuser position with live updates
+- **Speed Control**: Adjustable speed from 1 (slowest) to 9 (fastest)
+- **Continuous Movement**: Move IN/OUT buttons for continuous focuser movement
+- **Precise Positioning**: Go to Position for exact focuser positioning
+- **Emergency Stop**: STOP button to immediately halt all movement
+- **Connection Status**: Visual indicators for focuser and movement status
+- **Auto-refresh**: Position updates every 2 seconds automatically
+
+#### Web Interface Controls
+- **Connect Focuser**: Establishes connection to the focuser hardware
+- **Get Position**: Manually refresh current position
+- **Speed Slider**: Real-time speed adjustment (1-9)
+- **Movement Buttons**: Large, easy-to-use IN/OUT movement controls
+- **Position Input**: Enter exact position for precise focusing
+- **Status Indicators**: Color-coded connection and movement status
+
+#### Mobile-Friendly Design
+- **Responsive Layout**: Works perfectly on phones and tablets
+- **Touch-Optimized**: Large buttons for easy touch control
+- **Auto-reconnection**: WebSocket automatically reconnects if connection is lost
+- **Visual Feedback**: Clear status indicators and real-time updates
+
+### mDNS Support
+
+The ESP32 supports mDNS (multicast DNS) for easy device discovery:
+
+#### How mDNS Works
+- **Automatic Discovery**: Once connected to WiFi, the device advertises itself as `celestron-focuser.local`
+- **Easy Access**: Simply type `http://celestron-focuser.local` in any browser on the same network
+- **Custom Hostnames**: Set a custom hostname in the web interface (e.g., `my-focuser`) and access it at `my-focuser.local`
+
+#### Benefits
+- **No IP Address Needed**: Forget about remembering or finding the device's IP address
+- **Network Independent**: Works regardless of your router's IP range
+- **Cross-Platform**: Works on Windows, macOS, Linux, and mobile devices
+- **Automatic Updates**: If the IP changes, mDNS automatically updates
+
+#### Requirements
+- **Same Network**: Both the ESP32 and your computer must be on the same WiFi network
+- **mDNS Support**: Most modern operating systems support mDNS out of the box
+  - **Windows**: Requires Bonjour Print Services (usually pre-installed)
+  - **macOS**: Built-in support
+  - **Linux**: Requires `avahi-daemon` (usually pre-installed)
+  - **Mobile**: iOS and Android support mDNS
+
+### Troubleshooting WiFi
+
+#### Cannot Connect to AP
+- Ensure ESP32 is powered on and running
+- Check that you're connecting to `Celestron-Focuser`
+- Use password `focuser123`
+- Try different device or WiFi settings
+
+#### Web Interface Not Loading
+- Check IP address in serial monitor output
+- Ensure you're on the same network (AP mode: connect to ESP32 AP)
+- Try refreshing the page
+- Clear browser cache if needed
+
+#### Cannot Connect to Home WiFi
+- Verify WiFi credentials are correct
+- Check WiFi signal strength
+- Ensure 2.4GHz network (ESP32 doesn't support 5GHz)
+- Try clearing WiFi config and reconfiguring
+
+#### Device Keeps Switching to AP Mode
+- Check WiFi network stability
+- Verify credentials are saved correctly
+- Check for WiFi interference
+- Ensure router supports ESP32 devices
 
 ## Safety Warnings
 

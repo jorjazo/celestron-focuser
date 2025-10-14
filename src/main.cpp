@@ -11,6 +11,7 @@
 
 #include <Arduino.h>
 #include "celestron_aux.h"
+#include "wifi_manager.h"
 
 using namespace CelestronAux;
 
@@ -53,6 +54,9 @@ const unsigned long STATUS_CHECK_INTERVAL = 500;   // Check every 0.5 seconds
 String commandBuffer = "";
 bool commandReady = false;
 
+// WiFi Status
+bool wifiInitialized = false;
+
 // ============================================================================
 // Function Declarations
 // ============================================================================
@@ -60,15 +64,18 @@ bool commandReady = false;
 void setupSerial();
 void setupPins();
 bool initializeFocuser();
+void initializeWiFi();
 void processCommands();
 void handleCommand(char command);
 void handleGotoCommand(String value);
 void displayHelp();
 void displayStatus();
+bool handleWebFocuserCommand(String command, JsonDocument& doc);
 
 // Focuser Control Functions
 bool getFocuserPosition();
 bool moveFocuser(uint8_t direction, uint8_t speed);
+bool stepFocuser(uint8_t direction, uint32_t steps, uint8_t speed);
 bool gotoPosition(uint32_t position);
 bool stopFocuser();
 bool setSpeed(uint8_t speed);
@@ -108,6 +115,9 @@ void setup() {
     printInfo("AUX Pins: RX=" + String(AUX_RX_PIN) + ", TX=" + String(AUX_TX_PIN));
     printInfo("");
     
+    // Initialize WiFi
+    initializeWiFi();
+    
     // Initialize focuser (with safety check)
     printInfo("Attempting to initialize focuser...");
     
@@ -133,6 +143,23 @@ void setup() {
 // ============================================================================
 
 void loop() {
+    // Handle WiFi operations
+    if (wifiInitialized) {
+        wifiManager.handle();
+        
+        // Send periodic status updates to web clients
+        static unsigned long lastWebStatusUpdate = 0;
+        if (millis() - lastWebStatusUpdate > 1000) { // Every second
+            if (focuserConnected) {
+                // Send status to all connected web clients
+                for (int i = 0; i < 8; i++) {
+                    wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                }
+            }
+            lastWebStatusUpdate = millis();
+        }
+    }
+    
     // Process incoming commands
     processCommands();
     
@@ -163,6 +190,48 @@ void setupPins() {
     // Configure AUX serial pins
     pinMode(AUX_RX_PIN, INPUT);
     pinMode(AUX_TX_PIN, OUTPUT);
+}
+
+void initializeWiFi() {
+    printInfo("Initializing WiFi...");
+    
+    // Set up WiFi callbacks
+    wifiManager.onWiFiConnected([]() {
+        printSuccess("WiFi connected successfully!");
+        printInfo("WiFi SSID: " + wifiManager.getSSID());
+        printInfo("WiFi IP: " + wifiManager.getIPAddress());
+        printInfo("Web interface: http://" + wifiManager.getIPAddress());
+        printInfo("mDNS hostname: " + wifiManager.getmDNSHostname());
+        printInfo("Web interface (mDNS): http://" + wifiManager.getmDNSHostname());
+    });
+    
+    wifiManager.onWiFiDisconnected([]() {
+        printInfo("WiFi disconnected, switching to AP mode");
+    });
+    
+    // Set up focuser control callback
+    wifiManager.setFocuserCallback([](String command, JsonDocument& doc) -> bool {
+        return handleWebFocuserCommand(command, doc);
+    });
+    
+    // Initialize WiFi manager
+    if (wifiManager.begin()) {
+        wifiInitialized = true;
+        printSuccess("WiFi Manager initialized");
+        
+        if (wifiManager.isConnected()) {
+            printInfo("Connected to WiFi network");
+            printInfo("Web interface: http://" + wifiManager.getIPAddress());
+        } else {
+            printInfo("WiFi AP mode active");
+            printInfo("Connect to: " + String(WIFI_AP_SSID));
+            printInfo("Password: " + String(WIFI_AP_PASSWORD));
+            printInfo("Web interface: http://" + wifiManager.getIPAddress());
+        }
+    } else {
+        printError("Failed to initialize WiFi Manager");
+        wifiInitialized = false;
+    }
 }
 
 // ============================================================================
@@ -233,6 +302,24 @@ void handleCommand(char command) {
             
         case 't':
             testBaudRates();
+            return;
+            
+        case 'w':
+            if (wifiInitialized) {
+                printInfo("WiFi Status:");
+                printInfo("  Connected: " + String(wifiManager.isConnected() ? "Yes" : "No"));
+                printInfo("  Mode: " + String(wifiManager.isAPMode() ? "AP" : "Station"));
+                printInfo("  SSID: " + wifiManager.getSSID());
+                printInfo("  IP: " + wifiManager.getIPAddress());
+                printInfo("  Hostname: " + wifiManager.getHostname());
+                printInfo("  Web interface: http://" + wifiManager.getIPAddress());
+                if (wifiManager.isConnected() && !wifiManager.isAPMode()) {
+                    printInfo("  mDNS hostname: " + wifiManager.getmDNSHostname());
+                    printInfo("  Web interface (mDNS): http://" + wifiManager.getmDNSHostname());
+                }
+            } else {
+                printError("WiFi not initialized");
+            }
             return;
     }
     
@@ -381,6 +468,26 @@ bool moveFocuser(uint8_t direction, uint8_t speed) {
     return communicator.sendCommand(auxSerial, Target::FOCUSER, cmd, data, reply);
 }
 
+bool stepFocuser(uint8_t direction, uint32_t steps, uint8_t speed) {
+    // Get current position
+    uint32_t startPosition = currentPosition;
+    uint32_t targetPosition;
+    
+    if (direction == 1) {
+        targetPosition = startPosition + steps;
+    } else {
+        // Handle underflow
+        if (steps > startPosition) {
+            targetPosition = 0;
+        } else {
+            targetPosition = startPosition - steps;
+        }
+    }
+    
+    // Use goto command for precise stepping
+    return gotoPosition(targetPosition);
+}
+
 bool gotoPosition(uint32_t position) {
     Buffer data = {
         static_cast<uint8_t>((position >> 16) & 0xFF),
@@ -444,9 +551,17 @@ void displayHelp() {
     printInfo("  c     - Connect to focuser (retry connection)");
     printInfo("  d     - Run diagnostics (troubleshoot connection)");
     printInfo("  t     - Test different baud rates");
+    printInfo("  w     - Show WiFi status and web interface URL");
     printInfo("  ?     - Show this help");
     printInfo("  i     - Show status information");
     printInfo("");
+    
+    if (wifiInitialized) {
+        printInfo("WiFi Web Interface:");
+        printInfo("  URL: http://" + wifiManager.getIPAddress());
+        printInfo("  Use web interface to configure WiFi settings");
+        printInfo("");
+    }
 }
 
 void displayStatus() {
@@ -457,6 +572,20 @@ void displayStatus() {
     printInfo("  Current Speed: " + String(currentSpeed));
     printInfo("  Moving: " + String(isMoving ? "Yes" : "No"));
     printInfo("");
+    
+    if (wifiInitialized) {
+        printInfo("WiFi Status:");
+        printInfo("  Connected: " + String(wifiManager.isConnected() ? "Yes" : "No"));
+        printInfo("  Mode: " + String(wifiManager.isAPMode() ? "AP" : "Station"));
+        printInfo("  SSID: " + wifiManager.getSSID());
+        printInfo("  IP: " + wifiManager.getIPAddress());
+        printInfo("  Web interface: http://" + wifiManager.getIPAddress());
+        if (wifiManager.isConnected() && !wifiManager.isAPMode()) {
+            printInfo("  mDNS hostname: " + wifiManager.getmDNSHostname());
+            printInfo("  Web interface (mDNS): http://" + wifiManager.getmDNSHostname());
+        }
+        printInfo("");
+    }
 }
 
 uint32_t parsePosition(String value) {
@@ -595,4 +724,140 @@ void testBaudRates() {
     delay(100);
     
     printInfo("Restored original baud rate: " + String(AUX_BAUD_RATE));
+}
+
+// ============================================================================
+// Web Focuser Command Handler
+// ============================================================================
+
+bool handleWebFocuserCommand(String command, JsonDocument& doc) {
+    printInfo("Web command: " + command);
+    
+    if (command == "focuser:connect") {
+        // Connect to focuser
+        if (initializeFocuser()) {
+            // Send status update to all connected clients
+            for (int i = 0; i < 8; i++) {
+                wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+            }
+            return true;
+        }
+        return false;
+    }
+    else if (command == "focuser:getPosition") {
+        // Get current position
+        if (getFocuserPosition()) {
+            // Send status update to all connected clients
+            for (int i = 0; i < 8; i++) {
+                wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+            }
+            return true;
+        }
+        return false;
+    }
+    else if (command == "focuser:setSpeed") {
+        // Set focuser speed
+        if (doc["speed"].is<uint8_t>()) {
+            uint8_t newSpeed = doc["speed"];
+            if (newSpeed >= 1 && newSpeed <= 9) {
+                currentSpeed = newSpeed;
+                printInfo("Speed set to: " + String(currentSpeed));
+                
+                // Send status update to all connected clients
+                for (int i = 0; i < 8; i++) {
+                    wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (command == "focuser:move") {
+        // Move focuser in specified direction
+        if (doc["direction"].is<String>() && doc["speed"].is<uint8_t>()) {
+            String direction = doc["direction"];
+            uint8_t speed = doc["speed"];
+            
+            if (direction == "in") {
+                if (moveFocuser(1, speed)) {
+                    isMoving = true;
+                    // Send status update to all connected clients
+                    for (int i = 0; i < 8; i++) {
+                        wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                    }
+                    return true;
+                }
+            } else if (direction == "out") {
+                if (moveFocuser(0, speed)) {
+                    isMoving = true;
+                    // Send status update to all connected clients
+                    for (int i = 0; i < 8; i++) {
+                        wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    else if (command == "focuser:step") {
+        // Step focuser by specified number of steps
+        if (doc["direction"].is<String>() && doc["steps"].is<uint32_t>() && doc["speed"].is<uint8_t>()) {
+            String direction = doc["direction"];
+            uint32_t steps = doc["steps"];
+            uint8_t speed = doc["speed"];
+            
+            if (direction == "in") {
+                if (stepFocuser(1, steps, speed)) {
+                    isMoving = true;
+                    // Send status update to all connected clients
+                    for (int i = 0; i < 8; i++) {
+                        wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                    }
+                    return true;
+                }
+            } else if (direction == "out") {
+                if (stepFocuser(0, steps, speed)) {
+                    isMoving = true;
+                    // Send status update to all connected clients
+                    for (int i = 0; i < 8; i++) {
+                        wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    else if (command == "focuser:stop") {
+        // Stop focuser movement
+        if (stopFocuser()) {
+            isMoving = false;
+            // Send status update to all connected clients
+            for (int i = 0; i < 8; i++) {
+                wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+            }
+            return true;
+        }
+        return false;
+    }
+    else if (command == "focuser:goto") {
+        // Go to specific position
+        if (doc["position"].is<uint32_t>()) {
+            uint32_t position = doc["position"];
+            if (gotoPosition(position)) {
+                targetPosition = position;
+                isMoving = true;
+                // Send status update to all connected clients
+                for (int i = 0; i < 8; i++) {
+                    wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    printError("Unknown focuser command: " + command);
+    return false;
 }
