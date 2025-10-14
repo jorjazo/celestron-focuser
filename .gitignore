@@ -1,0 +1,56 @@
+# ESP32 Celestron Focuser Controller - Git Ignore File
+
+# Build directories
+build/
+.pio/
+.vscode/
+
+# Arduino IDE
+*.ino.bin
+*.ino.elf
+*.ino.hex
+*.ino.map
+
+# Object files
+*.o
+*.d
+*.a
+*.so
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# IDE files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Arduino CLI
+.arduino15/

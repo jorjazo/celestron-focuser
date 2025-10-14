@@ -1,0 +1,100 @@
+# ESP32 Celestron Focuser - Example Usage Session
+
+This file shows a typical usage session with the ESP32 Celestron Focuser Controller.
+
+## Startup Sequence
+```
+INFO: ESP32 Celestron Focuser Controller
+INFO: ==================================
+INFO: Hardware: ESP32 DevKit v1
+INFO: USB Serial: 115200 baud
+INFO: AUX Serial: 19200 baud
+INFO: AUX Pins: RX=16, TX=17
+INFO: 
+SUCCESS: Focuser initialized successfully
+SUCCESS: Firmware Version: 1.2
+INFO: Current Position: 15000
+INFO: Target Position: 15000
+INFO: Current Speed: 5
+INFO: Moving: No
+INFO: 
+INFO: Available Commands:
+INFO:   +     - Move focuser INWARD (continuous)
+INFO:   -     - Move focuser OUTWARD (continuous)
+INFO:   s, 0  - Stop movement
+INFO:   p     - Get current position
+INFO:   g#### - Go to absolute position (e.g., g5000)
+INFO:   1-9   - Set motor speed (1=slowest, 9=fastest)
+INFO:   ?     - Show this help
+INFO:   i     - Show status information
+```
+
+## Example Commands
+
+### Check Current Status
+```
+> i
+INFO: Focuser Status:
+INFO:   Connected: Yes
+INFO:   Current Position: 15000
+INFO:   Target Position: 15000
+INFO:   Current Speed: 5
+INFO:   Moving: No
+```
+
+### Set Speed and Move
+```
+> 3
+SUCCESS: Speed set to 3
+> +
+INFO: Moving focuser INWARD at speed 3
+> s
+INFO: Stopping focuser
+SUCCESS: Focuser reached target position: 14850
+```
+
+### Absolute Positioning
+```
+> g20000
+INFO: Moving to position 20000
+SUCCESS: Focuser reached target position: 20000
+> p
+INFO: Getting current position...
+INFO: Current position: 20000
+```
+
+### Fine Adjustment
+```
+> 1
+SUCCESS: Speed set to 1
+> +
+INFO: Moving focuser INWARD at speed 1
+> s
+INFO: Stopping focuser
+SUCCESS: Focuser reached target position: 19995
+```
+
+### Error Handling Example
+```
+> g99999
+INFO: Moving to position 99999
+ERROR: Move not allowed because it is out of range
+```
+
+## Tips for Best Results
+
+1. **Start Slow**: Use speed 1-3 for fine focusing
+2. **Check Position**: Use 'p' command to verify current position
+3. **Stop Safely**: Always use 's' or '0' to stop movement
+4. **Monitor Status**: Use 'i' command to check focuser status
+5. **Test First**: Try small movements before large position changes
+
+## Troubleshooting Commands
+
+If you encounter issues:
+
+1. **Check Connection**: Look for "Focuser not connected" errors
+2. **Verify Wiring**: Ensure level shifter is properly connected
+3. **Power Check**: Verify 12V supply to focuser
+4. **Reset**: Power cycle ESP32 and focuser if needed
+5. **Debug**: Monitor serial output for error messages
