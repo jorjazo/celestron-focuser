@@ -604,10 +604,10 @@ void WiFiManager::_handleRoot(AsyncWebServerRequest *request) {
 
                 <div class="movement-controls">
                     <button id="moveInBtn" onclick="moveFocuser('in')" class="movement-btn success" disabled>
-                        ⬆️ Move IN
+                        Move IN
                     </button>
                     <button id="moveOutBtn" onclick="moveFocuser('out')" class="movement-btn success" disabled>
-                        ⬇️ Move OUT
+                        Move OUT
                     </button>
                 </div>
 
@@ -631,13 +631,13 @@ void WiFiManager::_handleRoot(AsyncWebServerRequest *request) {
 
                 <div class="buttons">
                     <button id="stopBtn" onclick="stopFocuser()" class="danger movement-btn" disabled>
-                        🛑 STOP
+                        STOP
                     </button>
                     <button onclick="getPosition()" class="warning">
-                        📍 Get Position
+                        Get Position
                     </button>
                     <button onclick="connectFocuser()" class="success">
-                        🔌 Connect Focuser
+                        Connect Focuser
                     </button>
                 </div>
             </div>
@@ -671,7 +671,7 @@ void WiFiManager::_handleRoot(AsyncWebServerRequest *request) {
 
             <!-- System Info Panel -->
             <div class="panel">
-                <h2>ℹ️ System Information</h2>
+                <h2>System Information</h2>
                 <div class="info">
                     <strong>Connection Info:</strong><br>
                     <span id="connectionInfo">Loading...</span>
@@ -880,9 +880,21 @@ void WiFiManager::_handleRoot(AsyncWebServerRequest *request) {
         
         function connectFocuser() {
             if (ws && ws.readyState === WebSocket.OPEN) {
+                // Show loading state
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'Connecting...';
+                btn.disabled = true;
+                
                 ws.send(JSON.stringify({
                     command: 'focuser:connect'
                 }));
+                
+                // Reset button after a delay
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }, 3000);
             }
         }
         

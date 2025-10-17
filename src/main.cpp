@@ -160,6 +160,22 @@ void loop() {
         }
     }
     
+    // Automatic focuser reconnection detection
+    static unsigned long lastFocuserCheck = 0;
+    if (!focuserConnected && millis() - lastFocuserCheck > 5000) { // Check every 5 seconds if not connected
+        if (initializeFocuser()) {
+            focuserConnected = true;
+            printSuccess("Focuser automatically reconnected!");
+            // Send status update to all connected web clients
+            if (wifiInitialized) {
+                for (int i = 0; i < 8; i++) {
+                    wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+                }
+            }
+        }
+        lastFocuserCheck = millis();
+    }
+    
     // Process incoming commands
     processCommands();
     
@@ -736,11 +752,18 @@ bool handleWebFocuserCommand(String command, JsonDocument& doc) {
     if (command == "focuser:connect") {
         // Connect to focuser
         if (initializeFocuser()) {
+            focuserConnected = true;
             // Send status update to all connected clients
             for (int i = 0; i < 8; i++) {
                 wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
             }
             return true;
+        } else {
+            focuserConnected = false;
+            // Send status update to all connected clients
+            for (int i = 0; i < 8; i++) {
+                wifiManager.sendFocuserStatus(i, focuserConnected, currentPosition, targetPosition, currentSpeed, isMoving);
+            }
         }
         return false;
     }
